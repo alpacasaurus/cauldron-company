@@ -59,3 +59,16 @@ Tab overlay, and yard scaling landed in `witches/map.py`.
 | `114536-gameplay-hud-recipes` | Cauldron panel, cheat sheet, delivery banner, pair hints |
 | `114536-gameplay-recipe-overlay` | Tab recipe book over live gameplay |
 | `114536-gameplay-wide-map` | Expanded clearing — hub fixed, forage pushed to treeline |
+
+## Pixel HUD and recipe book (2026-08-30 afternoon)
+
+After replacing letter HUD glyphs with pixel art, adding pocket/cauldron icon
+panels, broom melee, distinct enemy markers, and restructuring the Tab recipe
+book (`witches/hudicons.py`, `witches/uistyle.py`, `witches/iconart.py`).
+
+| Screenshot | What it shows |
+|---|---|
+| `123831-player-cauldron-hud` | Full shift HUD — POCKETS/CARRYING rows, cauldron icon row with stir bar, recipe sidebar, deliver banner |
+| `123328-recipe-headings-spaced` | Tab recipe book — POTIONS / GEAR / FOOD sections, tinted panels, directional arrows |
+| `122041-recipe-structure` | Earlier recipe book layout pass with section panels and row bands |
+| `123112-recipe-arrows-clean` | Compact gold arrow sprites between ingredients and outcomes |

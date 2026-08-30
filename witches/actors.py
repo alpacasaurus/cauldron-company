@@ -24,6 +24,9 @@ class Witch(Entity):
         self.weapon = None
         self.weapon_cooldown = 0
         self.weapon_model = None
+        self.broom_swing = 0
+        self.broom_rest_pos = Vec3(0.5, 1.0, 0.15)
+        self.broom_rest_rot = Vec3(0, 0, 18)
         self.vy = 0
         self.grounded = True
         self.stun = 0
@@ -77,9 +80,9 @@ class Witch(Entity):
             parent=self,
             model="cube",
             color=color.hsv(30, 0.5, 0.4),
-            position=(0.5, 1.0, 0.15),
+            position=self.broom_rest_pos,
             scale=(0.09, 1.7, 0.09),
-            rotation=(0, 0, 18),
+            rotation=self.broom_rest_rot,
         )
         Entity(
             parent=self.broom,
@@ -123,16 +126,48 @@ class Witch(Entity):
         self.bus.say(f"{self.display_name} equipped the {spec['name']}. Fire away.")
 
     def try_fire(self):
-        if not self.weapon:
-            self.bus.say(f"{self.display_name} points an accusing finger. Brew a weapon first.")
-            return False
         if self.weapon_cooldown > 0 or self.stun > 0:
             return False
-        from witches.combat import Projectile, WEAPONS
+        if self.weapon:
+            from witches.combat import Projectile, WEAPONS
 
-        Projectile(self.bus, self, self.weapon)
-        self.weapon_cooldown = WEAPONS[self.weapon]["cooldown"]
+            Projectile(self.bus, self, self.weapon)
+            self.weapon_cooldown = WEAPONS[self.weapon]["cooldown"]
+            return True
+
+        from witches.combat import BROOM, try_broom_sweep
+
+        self.broom_swing = BROOM["swing_time"]
+        hits = try_broom_sweep(self.bus, self)
+        self.weapon_cooldown = BROOM["cooldown"]
+        if hits:
+            names = ", ".join(enemy.display_name for enemy in hits)
+            self.bus.say(
+                f"{self.display_name} clobbered {names} with the work broom.",
+                rank=DIALOGUE_AMBIENT,
+            )
         return True
+
+    def _animate_broom(self, dt):
+        from witches.combat import BROOM
+
+        if self.broom_swing <= 0:
+            self.broom.position = self.broom_rest_pos
+            self.broom.rotation = self.broom_rest_rot
+            return
+        self.broom_swing = max(0, self.broom_swing - dt)
+        phase = 1 - self.broom_swing / BROOM["swing_time"]
+        arc = math.sin(phase * math.pi)
+        self.broom.rotation = Vec3(
+            -58 * arc,
+            28 * arc,
+            self.broom_rest_rot.z - 24 * arc,
+        )
+        self.broom.position = Vec3(
+            self.broom_rest_pos.x - 0.35 * arc,
+            self.broom_rest_pos.y + 0.18 * arc,
+            self.broom_rest_pos.z + 0.58 * arc,
+        )
 
     def heal(self, amount):
         before = self.health
@@ -200,6 +235,7 @@ class Witch(Entity):
         self.stun = max(0, self.stun - dt)
         self.dash_cd = max(0, self.dash_cd - dt)
         self.weapon_cooldown = max(0, self.weapon_cooldown - dt)
+        self._animate_broom(dt)
         for k in list(self.effects):
             self.effects[k] -= dt
             if self.effects[k] <= 0:

@@ -240,11 +240,11 @@ def format_recipe_options(known_ids, max_items=3):
     options = recipe_pair_options(known_ids)
     if not options:
         return ""
-    parts = [f"{missing} → {outcome}" for missing, outcome in options[:max_items]]
+    parts = [f"{missing} -> {outcome}" for missing, outcome in options[:max_items]]
     text = " | ".join(parts)
     extra = len(options) - max_items
     if extra > 0:
-        text += f" | +{extra} more (Esc → Recipes)"
+        text += f" | +{extra} more (Esc -> Recipes)"
     return text
 
 
@@ -260,17 +260,18 @@ def needed_ingredient_id_set(known_ids):
 
 def recipe_menu_text():
     """Compact recipe reference for menu screens."""
-    lines = ["POTIONS — deliver flask to crate for quota points"]
+    lines = ["POTIONS - deliver flask to crate for quota points"]
     for ids, (name, _effect, value) in sorted(
         RECIPES.items(), key=lambda item: (-item[1][2], item[1][0])
     ):
-        lines.append(f"  {_pair_label(ids)} → {name} (+{value})")
-    lines.append("WEAPONS — same stir, auto-equips; R / Right Ctrl to fire")
+        lines.append(f"  {_pair_label(ids)} -> {name} (+{value})")
+    lines.append("WEAPONS - same stir, auto-equips; R / Right Ctrl to fire")
+    lines.append("  No weapon yet? R still works - whack pests with your broom.")
     for ids, weapon_id in sorted(WEAPON_RECIPES.items(), key=lambda item: WEAPON_DISPLAY[item[1]]):
-        lines.append(f"  {_pair_label(ids)} → {WEAPON_DISPLAY[weapon_id]}")
-    lines.append("FOOD — drink key with empty flask to eat (+HP)")
+        lines.append(f"  {_pair_label(ids)} -> {WEAPON_DISPLAY[weapon_id]}")
+    lines.append("FOOD - drink key with empty flask to eat (+HP)")
     for ids, (name, healing) in sorted(FOOD_RECIPES.items(), key=lambda item: item[1][0]):
-        lines.append(f"  {_pair_label(ids)} → {name} (+{healing} HP)")
+        lines.append(f"  {_pair_label(ids)} -> {name} (+{healing} HP)")
     lines.append("Unknown pairs become random sludge (+1). Compliment the cauldron.")
     return "\n".join(lines)
 
@@ -287,20 +288,20 @@ def hud_quick_recipes():
         RECIPES.items(), key=lambda item: (-item[1][2], item[1][0])
     ):
         if value >= 3:
-            lines.append(f"{_pair_label(ids)} → {name} (+{value})")
+            lines.append(f"{_pair_label(ids)} -> {name} (+{value})")
     lines.append("More +2 potions:")
     shown = 0
     for ids, (name, _effect, value) in sorted(
         RECIPES.items(), key=lambda item: item[1][0]
     ):
         if value == 2 and shown < 3:
-            lines.append(f"{_pair_label(ids)} → {name}")
+            lines.append(f"{_pair_label(ids)} -> {name}")
             shown += 1
     lines.append("WEAPONS / FOOD")
     for ids, weapon_id in sorted(WEAPON_RECIPES.items(), key=lambda item: WEAPON_DISPLAY[item[1]]):
-        lines.append(f"{_pair_label(ids)} → {WEAPON_DISPLAY[weapon_id]}")
+        lines.append(f"{_pair_label(ids)} -> {WEAPON_DISPLAY[weapon_id]}")
     for ids, (name, healing) in sorted(FOOD_RECIPES.items(), key=lambda item: item[1][0]):
-        lines.append(f"{_pair_label(ids)} → {name} (+{healing} HP)")
+        lines.append(f"{_pair_label(ids)} -> {name} (+{healing} HP)")
     return "\n".join(lines)
 
 

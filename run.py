@@ -4,6 +4,7 @@
 from ursina import Ursina, color, window
 
 from witches.glfix import patch_ursina_shaders
+from witches.uistyle import WINDOW_SIZE
 
 patch_ursina_shaders()
 
@@ -13,7 +14,7 @@ app = Ursina(
     fullscreen=False,
     development_mode=False,
     editor_ui_enabled=False,
-    size=(1280, 720),
+    size=WINDOW_SIZE,
     vsync=True,
 )
 window.color = color.hsv(250, 0.45, 0.07)

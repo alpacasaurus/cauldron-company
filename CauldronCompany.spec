@@ -36,6 +36,7 @@ hiddenimports += [
     "witches.forage",
     "witches.brew",
     "witches.catalog",
+    "witches.iconart",
     "witches.combat",
     "witches.barks",
     "witches.debuglog",

@@ -84,7 +84,10 @@ def prepare_screen(director, screen):
         director.cauldron.contents.append(
             {"id": "screamstool", "name": "Screamstool"}
         )
-        director.cauldron.stir = 3
+        director.cauldron.contents.append(
+            {"id": "gossipmoss", "name": "Gossip Moss"}
+        )
+        director.cauldron.stir = 5
         p1.inventory.append({"id": "dew", "name": "Suspicious Dew"})
         p2.inventory.append({"id": "breadbone", "name": "Probably a Breadstick"})
         p2.inventory.append({"id": "yarncurse", "name": "Cursed Yarnball"})
@@ -164,7 +167,7 @@ def main():
     )
     ap.add_argument("--players", type=int, default=0, help="0 keeps the title screen")
     ap.add_argument("--frames", type=int, default=45)
-    ap.add_argument("--size", default="1280x720")
+    ap.add_argument("--size", default="1920x1080")
     args = ap.parse_args()
 
     out = resolve_output(args.out, args.label)

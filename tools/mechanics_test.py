@@ -78,8 +78,8 @@ def main():
     check("P2 keyboard movement works", (p2.position - before).length() > 0)
     clear_keys()
     director.update()
-    check("P1 inventory HUD renders", "Hex:" in director.txt_p1.text)
-    check("P2 inventory HUD renders", "Jinx:" in director.txt_p2.text)
+    check("P1 inventory HUD renders", "Hex" in director.p1_status.name.text)
+    check("P2 inventory HUD renders", "Jinx" in director.p2_status.name.text)
 
     print("\nforaging and inventory")
     p1.inventory.clear()
@@ -260,6 +260,16 @@ def main():
     check("deliberate over-stir triggers tantrum", cauldron.stir == 0 and not cauldron.contents)
 
     print("\nweapons, enemies, and cooked food")
+    p1.weapon = None
+    p1.position = Vec3(10, 0, 10)
+    p1.facing = Vec3(0, 0, 1)
+    broom_target = Enemy(bus, p1.position + Vec3(0, 0.65, 2))
+    p1.weapon_cooldown = 0
+    check("broom sweep hits without a weapon", p1.try_fire() and broom_target.hp == 1)
+    p1.weapon_cooldown = 0
+    p1.try_fire()
+    check("broom can defeat an enemy", broom_target.dead)
+
     p1.position = cauldron.position + Vec3(0, 0, 1.8)
     bow_ingredients = next(ids for ids, weapon in WEAPON_RECIPES.items() if weapon == "bow")
     cauldron.contents = [

@@ -9,7 +9,9 @@ the rest of the time the bottom line is a plain hint about what's in reach.
 
 **Heads up:** the NPCs are foul-mouthed on purpose. See [NPC trash talk](#npc-trash-talk).
 
-![Cauldron Company gameplay with recipe HUD](screenshots/2026-08-30_114536-gameplay-hud-recipes.png)
+![Cauldron Company gameplay — pixel HUD, cauldron state, and pocket icons](screenshots/2026-08-30_123831-player-cauldron-hud.png)
+
+The game window defaults to **1920×1080** with a scaled HUD (`witches/uistyle.py`) so icons stay crisp on modern displays.
 
 ## Run from source
 
@@ -49,9 +51,9 @@ The game opens on a main menu: **Play**, **How to play**, **Quit**.
 
 ![Pause menu](screenshots/2026-08-30_114536-menu-pause.png)
 
-- **Tab** during a shift toggles the same recipe list without pausing.
+- **Tab** during a shift toggles a full-screen **Recipe book** overlay — potions, gear, and food as icon rows with section panels and directional arrows (gameplay HUD hides while it is open).
 
-![Recipe overlay](screenshots/2026-08-30_114536-gameplay-recipe-overlay.png)
+![Recipe book overlay](screenshots/2026-08-30_123328-recipe-headings-spaced.png)
 
 - Finishing a shift gives you **Play again / Main menu / Quit** with your quota
   and kill count, so nobody has to relaunch the game between rounds.
@@ -74,20 +76,54 @@ Expect to run between the green cauldron mat and the treeline.
 
 Layout constants live in `witches/map.py` if you want to scale the whole yard.
 
-## Recipe guidance
+## Pixel HUD
 
-You do not have to memorize the README. During a shift the HUD tells you what to
-grab and what it makes:
+You do not have to memorize the README. During a shift the HUD shows what you are
+holding, what is in the pot, and what it will make — all with the same pixel-art
+icons you see on the ground.
 
-- **Top center:** cauldron status, stir progress bar, and what ingredient is
-  still missing for the batch in the pot.
-- **Top right:** compact cheat sheet of high-value potions, weapons, and food.
-- **Bottom subtitle:** context hints — nearest snack, pairings, dump/stir prompts.
-- **Player inventory:** a `↳` line showing what your held item pairs with.
-- **Gold banner:** appears when you are carrying a deliverable flask.
+Icons live in `witches/assets/textures/hud/` (128×128, nearest-neighbor). World
+pickups are billboards using those textures (`witches/forage.py`), so a mushroom
+on the lawn matches the mushroom in your pocket.
 
-All recipe text is generated from `witches/catalog.py`, so the hints, menus, and
-actual brewing logic stay in sync.
+### Top bar
+
+- **Top left:** moon quota (`MOON 4/8`)
+- **Top right:** shift timer
+- **Top center:** gold deliver banner when you are carrying a quota flask
+
+### Cauldron panel (top left)
+
+Icon row in recipe format: `[ingredient] [ingredient] → [outcome]`
+
+- Empty slots show as dim placeholders while you are still dumping
+- One ingredient → second slot empty, arrow, and a hint icon for what pairs with it
+- Two ingredients → predicted outcome icon (potion value, bow, pistol, or food)
+- **Meta line below:** stir progress bar (`[█████░░░] 5/8`), `need partner`, `settling`, or `cooling` timers
+
+### Recipe sidebar (top right)
+
+Five compact rows of high-value potions, weapons, and meals — same icon layout as
+the cauldron row. Hidden while the Tab recipe book is open.
+
+### Player panels (bottom corners)
+
+Each witch gets a status block:
+
+- **Name and HP** (`Hex 5/5 HP`)
+- **POCKETS** — three fixed slots (empty slots stay visible)
+- **CARRYING** — icons for held flask (+quota value), cooked meal (+healing), equipped weapon, or active potion effects (warning badge with count)
+
+### Bottom lines
+
+- **Subtitle (gold):** context hints — nearest snack, dump/stir prompts, foe range, deliver nudge. Plain text unless Eric speaks at a milestone.
+- **Bark line (red):** NPC trash talk, separate from hints so goblins cannot bury your controls reminder.
+- **Key row:** `Tab recipes · Esc pause · E interact · F use · R attack` (hidden when dialogue fills the bottom)
+
+Press **Tab** for the full recipe reference, or **Recipes** from the pause menu.
+
+All recipe logic and hint text are generated from `witches/catalog.py`, so icons,
+menus, and brewing stay in sync.
 
 ## Controls
 
@@ -98,7 +134,7 @@ actual brewing logic stay in sync.
 | Broom dash (sometimes betrayal) | Left Shift | Right Shift |
 | Hop | Space | `/` |
 | Drink your flask | F | `'` |
-| Fire equipped weapon | R | Right Control |
+| Fire weapon / broom whack | R | Right Control |
 | Scritch the familiar | Q | P |
 | Compliment the cauldron | C | `]` |
 | Recipe book overlay | Tab | Tab |
@@ -106,7 +142,8 @@ actual brewing logic stay in sync.
 
 Gamepad: player 1 uses the first pad (A interact, B dash, X jump, Y drink). A second pad maps to witch 2.
 
-Walk onto a glowing ingredient to auto-pocket it, or press interact nearby.
+Walk onto a glowing ingredient to auto-pocket it, or press interact nearby. Pickups
+use the same pixel sprites as the HUD.
 
 The cauldron can only be worked from the green mat on the ground around it. The
 mat brightens while a witch is in reach. Stand on it and press interact to dump
@@ -129,6 +166,8 @@ holding an ingredient, interact always dumps.
 - Dump ingredients within four seconds of each other for a **Besties** bonus.
 - Drinking a flask applies chaos (tiny, giant, reverse controls, moonjump, hiccups, spin, honk, sticky, shuffle) and **does not** count for quota.
 - The cauldron can also cook healing food or harden a batch into a weapon.
+- **Night pests** spawn from the treeline — red bodies, horns, glowing eyes, and a warning marker so they read as foes, not coworkers. Context hint counts steps when one is close.
+- **R** fires your bow or pistol when equipped; with empty hands it sweeps the **work broom** in an arc instead.
 - The **hut door** chews. Press interact at the door and it insults you back.
 - Press interact while stuck on gossip moss (pockets full) to hear what the moss knows.
 
@@ -223,11 +262,22 @@ python tools/shot.py --label gameplay --players 2 --frames 90
 python tools/capture_readme_shots.py
 
 # Named UI states for one-off captures
-python tools/shot.py --screen hud --label gameplay-hud-recipes --frames 90
+python tools/shot.py --screen hud --label gameplay-hud --frames 90
+python tools/shot.py --screen overlay --label recipe-book --frames 90
+
+# Regenerate HUD pixel-art PNGs after editing tools/generate_hud_icons.py
+python tools/generate_hud_icons.py
+
+# Verify Tab recipe book rows fit inside the overlay card
+python tools/verify_recipe_book_layout.py
 
 # Minimal render probe (one cube, one sphere, one line of text)
 python tools/probe.py
 ```
+
+HUD widgets live in `witches/hudicons.py` (`PlayerStatusBar`, `CauldronStatusBar`,
+`RecipeSidebar`, `RecipeBookOverlay`, `IconBadge`). Textures load through
+`witches/iconart.py`.
 
 Every screenshot taken during development is kept in [`screenshots/`](screenshots/README.md),
 including the macOS rendering bug hunt.
