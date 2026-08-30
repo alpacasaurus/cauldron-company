@@ -13,6 +13,7 @@ from witches.barks import (
     pick,
 )
 from witches.catalog import DIALOGUE_AMBIENT, DIALOGUE_MILESTONE
+from witches.map import ENEMY_SPAWN_MAX, ENEMY_SPAWN_MIN
 
 
 WEAPONS = {
@@ -165,5 +166,5 @@ class Enemy(Entity):
 
 def spawn_enemy(bus):
     angle = random.uniform(0, math.tau)
-    radius = random.uniform(15, 20)
+    radius = random.uniform(ENEMY_SPAWN_MIN, ENEMY_SPAWN_MAX)
     return Enemy(bus, Vec3(math.cos(angle) * radius, 0.65, math.sin(angle) * radius))

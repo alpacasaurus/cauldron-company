@@ -9,7 +9,7 @@ the rest of the time the bottom line is a plain hint about what's in reach.
 
 **Heads up:** the NPCs are foul-mouthed on purpose. See [NPC trash talk](#npc-trash-talk).
 
-![Cauldron Company gameplay](screenshots/2026-08-29_221711-gameplay-verified.png)
+![Cauldron Company gameplay with recipe HUD](screenshots/2026-08-30_114536-gameplay-hud-recipes.png)
 
 ## Run from source
 
@@ -30,20 +30,64 @@ python run.py
 
 The game opens on a main menu: **Play**, **How to play**, **Quit**.
 
-![Main menu](screenshots/2026-08-30_001407-menu-main.png)
+![Main menu](screenshots/2026-08-30_114536-menu-main.png)
 
 - **Play** asks for 1 or 2 witches.
-- **How to play** is the full control table and the short version of the loop.
+
+![Witch count](screenshots/2026-08-30_114536-menu-play.png)
+
+- **How to play** is the full control table, the short version of the loop, and a
+  link to the full **Recipe list**.
+
+![How to play](screenshots/2026-08-30_114536-menu-controls.png)
+
+![Recipe list](screenshots/2026-08-30_114536-menu-recipes.png)
+
 - **Esc** pauses a shift rather than killing the app, which matters when four
-  hands share one keyboard. The pause menu offers Resume, Restart shift, Main
-  menu, and Quit. Esc backs out of menu screens, and only quits from the main
-  menu.
+  hands share one keyboard. The pause menu offers Resume, **Recipes**, Restart
+  shift, Main menu, and Quit.
+
+![Pause menu](screenshots/2026-08-30_114536-menu-pause.png)
+
+- **Tab** during a shift toggles the same recipe list without pausing.
+
+![Recipe overlay](screenshots/2026-08-30_114536-gameplay-recipe-overlay.png)
+
 - Finishing a shift gives you **Play again / Main menu / Quit** with your quota
   and kill count, so nobody has to relaunch the game between rounds.
+
+![End screen](screenshots/2026-08-30_114536-menu-endscreen.png)
+
+Esc backs out of menu screens, and only quits from the main menu.
 
 Returning to the menu tears the whole clearing down and rebuilds it on the next
 shift. `witches/teardown.py` exists because Ursina's `destroy()` leaves child
 entities in the scene, which otherwise stacks a second forest on every replay.
+
+## The clearing
+
+The yard is a wide ring around a fixed hub: hut, cauldron, and quota crate stay
+put, but ingredients, pests, and trees spawn much farther out than they used to.
+Expect to run between the green cauldron mat and the treeline.
+
+![Wide clearing](screenshots/2026-08-30_114536-gameplay-wide-map.png)
+
+Layout constants live in `witches/map.py` if you want to scale the whole yard.
+
+## Recipe guidance
+
+You do not have to memorize the README. During a shift the HUD tells you what to
+grab and what it makes:
+
+- **Top center:** cauldron status, stir progress bar, and what ingredient is
+  still missing for the batch in the pot.
+- **Top right:** compact cheat sheet of high-value potions, weapons, and food.
+- **Bottom subtitle:** context hints — nearest snack, pairings, dump/stir prompts.
+- **Player inventory:** a `↳` line showing what your held item pairs with.
+- **Gold banner:** appears when you are carrying a deliverable flask.
+
+All recipe text is generated from `witches/catalog.py`, so the hints, menus, and
+actual brewing logic stay in sync.
 
 ## Controls
 
@@ -57,6 +101,7 @@ entities in the scene, which otherwise stacks a second forest on every replay.
 | Fire equipped weapon | R | Right Control |
 | Scritch the familiar | Q | P |
 | Compliment the cauldron | C | `]` |
+| Recipe book overlay | Tab | Tab |
 | Pause / back | Esc | Esc |
 
 Gamepad: player 1 uses the first pad (A interact, B dash, X jump, Y drink). A second pad maps to witch 2.
@@ -174,6 +219,12 @@ python tools/mechanics_test.py
 # Save a timestamped screenshot into screenshots/
 python tools/shot.py --label gameplay --players 2 --frames 90
 
+# Capture the full README screenshot set (menus, HUD, overlay, wide map)
+python tools/capture_readme_shots.py
+
+# Named UI states for one-off captures
+python tools/shot.py --screen hud --label gameplay-hud-recipes --frames 90
+
 # Minimal render probe (one cube, one sphere, one line of text)
 python tools/probe.py
 ```
@@ -194,20 +245,25 @@ and works on Windows too.
 
 Two-ingredient dumps (order does not matter):
 
-- Screamstool + Suspicious Dew → Voice of Unreasonable Confidence
-- Mandrake Intern + Frog of Dubious Harmony → Newt Relapse
-- Cursed Yarnball + Gossip Moss → Grandma's Floor Wax
-- Moon Slug + Suspicious Dew → Floaty Feelings
-- Night Milk + Probably a Breadstick → Bedtime Weapon
-- Borrowed Gnome Hat + Screamstool → HR Violation Stew
-- Frog + Night Milk → Karaoke Gravity
-- Gossip Moss + Dew → Slander Slushie
-- Yarn + Moon Slug → Catnip Bankruptcy
-- Mandrake + Gnome Hat → Intern to Middle Management
+- Screamstool + Suspicious Dew → Voice of Unreasonable Confidence (+2)
+- Mandrake Intern + Frog of Dubious Harmony → Newt Relapse (+2)
+- Cursed Yarnball + Gossip Moss → Grandma's Floor Wax (+2)
+- Moon Slug + Suspicious Dew → Floaty Feelings (+2)
+- Night Milk + Probably a Breadstick → Bedtime Weapon (+2)
+- Borrowed Gnome Hat + Screamstool → HR Violation Stew (+3)
+- Frog + Night Milk → Karaoke Gravity (+2)
+- Gossip Moss + Dew → Slander Slushie (+2)
+- Yarn + Moon Slug → Catnip Bankruptcy (+2)
+- Mandrake + Gnome Hat → Intern to Middle Management (+3)
+- Screamstool + Screamstool → That's Just Soup (+1)
 
 Anything else becomes a random *Regret Custard* situation. That's the genre.
+Press **Tab** or open **Recipes** from the pause menu for the live in-game list.
 
 ## Weapons and meals
+
+Dump and stir like a potion — the cauldron equips weapons or pockets food instead
+of bottling a flask:
 
 - Probably a Breadstick + Cursed Yarnball → **Union Bow**
 - Borrowed Gnome Hat + Suspicious Dew → **Dewpoint Pistol**
@@ -215,4 +271,4 @@ Anything else becomes a random *Regret Custard* situation. That's the genre.
 - Night Milk + Suspicious Dew → **Moon Milk Porridge** (+2 health)
 
 Press the drink key with no flask held to eat a cooked meal. Enemies wander in
-slowly, deal one damage at a leisurely pace, and take two hits to defeat.
+from the treeline, deal one damage at a leisurely pace, and take two hits to defeat.

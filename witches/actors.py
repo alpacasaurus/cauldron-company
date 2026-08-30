@@ -9,6 +9,7 @@ from witches.meshes import mesh
 
 from witches.barks import FAMILIAR_SCRITCH, FAMILIAR_THEFT, pick
 from witches.catalog import DIALOGUE_AMBIENT, DIALOGUE_MILESTONE
+from witches.map import MAP_LIMIT
 
 
 class Witch(Entity):
@@ -258,9 +259,8 @@ class Witch(Entity):
             self.grounded = False
 
         # world bounds
-        lim = 22
-        self.x = max(-lim, min(lim, self.x))
-        self.z = max(-lim, min(lim, self.z))
+        self.x = max(-MAP_LIMIT, min(MAP_LIMIT, self.x))
+        self.z = max(-MAP_LIMIT, min(MAP_LIMIT, self.z))
 
         # crude hut collision (hut body spans z -11.6..-6.4 around x 0)
         if abs(self.x) < 2.9 and -11.8 < self.z < -6.2 and self.y < 3:
@@ -344,7 +344,7 @@ class Familiar(Entity):
         if self.target:
             dest = self.target.position
             if self.yarn > 0:
-                dest = Vec3(8, 0, -6)
+                dest = Vec3(MAP_LIMIT * 0.45, 0, -MAP_LIMIT * 0.2)
             delta = dest - self.position
             delta.y = 0
             if delta.length() > 0.4:

@@ -6,6 +6,16 @@ from pathlib import Path
 
 from ursina import Entity, Vec3, color, load_texture
 
+from witches.map import (
+    CLEARING_SCALE,
+    CRATE_POS,
+    GROUND_SCALE,
+    MOON_POS,
+    MUSHROOM_RING,
+    TREE_HUB_GAP,
+    TREE_RING_MAX,
+    TREE_RING_MIN,
+)
 from witches.barks import HUT_BARKS, pick
 from witches.catalog import HUT_LINES
 from witches.meshes import mesh
@@ -26,9 +36,9 @@ class World:
         self._track(
             Entity(
                 model="plane",
-                scale=120,
+                scale=GROUND_SCALE,
                 texture=load_texture("forest_ground", TEXTURE_DIR),
-                texture_scale=(18, 18),
+                texture_scale=(24, 24),
                 color=color.rgba32(170, 190, 175, 255),
                 collider="box",
             )
@@ -39,9 +49,9 @@ class World:
                 model=mesh("circle"),
                 rotation_x=90,
                 y=0.02,
-                scale=22,
+                scale=CLEARING_SCALE,
                 texture=load_texture("dirt_clearing", TEXTURE_DIR),
-                texture_scale=(5, 5),
+                texture_scale=(6, 6),
                 color=color.rgba32(205, 185, 160, 255),
             )
         )
@@ -53,7 +63,7 @@ class World:
             Entity(
                 model="cube",
                 color=color.hsv(40, 0.7, 0.42),
-                position=(6.5, 0.55, 2.5),
+                position=CRATE_POS,
                 scale=(1.6, 1.1, 1.2),
                 collider="box",
             )
@@ -70,7 +80,7 @@ class World:
             Entity(
                 model="sphere",
                 color=color.hsv(50, 0.1, 1),
-                position=(18, 28, -22),
+                position=MOON_POS,
                 scale=6,
                 unlit=True,
             )
@@ -136,9 +146,9 @@ class World:
         rng = random.Random(13)
         for _ in range(55):
             ang = rng.random() * math.tau
-            dist = rng.uniform(16, 42)
+            dist = rng.uniform(TREE_RING_MIN, TREE_RING_MAX)
             pos = Vec3(math.cos(ang) * dist, 0, math.sin(ang) * dist)
-            if pos.length() < 14:
+            if pos.length() < TREE_HUB_GAP:
                 continue
             trunk = self._track(
                 Entity(
@@ -162,7 +172,7 @@ class World:
         # a few dead snags closer in
         for _ in range(8):
             ang = rng.random() * math.tau
-            dist = rng.uniform(10, 15)
+            dist = rng.uniform(TREE_HUB_GAP - 4, TREE_HUB_GAP + 2)
             pos = Vec3(math.cos(ang) * dist, 0.9, math.sin(ang) * dist)
             self._track(
                 Entity(
@@ -177,7 +187,7 @@ class World:
     def _fence_mushrooms(self):
         for i in range(18):
             a = i / 18 * math.tau
-            r = 12.5
+            r = MUSHROOM_RING
             self._track(
                 Entity(
                     model=mesh("cylinder"),

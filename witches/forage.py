@@ -6,6 +6,7 @@ import random
 from ursina import Entity, Vec3, color, time
 
 from witches.catalog import INGREDIENTS
+from witches.map import FORAGE_COUNT, FORAGE_MAX, FORAGE_MIN, HUB_RADIUS, MAP_LIMIT, forage_spawn_ok
 from witches.meshes import mesh
 from witches.teardown import destroy_tree
 
@@ -110,24 +111,22 @@ class Forage(Entity):
                 self.bus.say("The intern files a scream with HR.")
 
         # stay in woods-ish bounds
-        if self.position.xz.length() < 6:
+        if self.position.xz.length() < HUB_RADIUS:
             self.position *= 1.02
-        lim = 22
-        self.x = max(-lim, min(lim, self.x))
-        self.z = max(-lim, min(lim, self.z))
+        self.x = max(-MAP_LIMIT, min(MAP_LIMIT, self.x))
+        self.z = max(-MAP_LIMIT, min(MAP_LIMIT, self.z))
         self.pad.x, self.pad.z = self.x, self.z
 
 
-def spawn_forage(bus, n=18):
+def spawn_forage(bus, n=FORAGE_COUNT):
     kinds = list(INGREDIENTS.keys())
     out = []
     for _ in range(n):
-        for _try in range(20):
+        for _try in range(24):
             ang = random.random() * math.tau
-            dist = random.uniform(7.5, 16)
+            dist = random.uniform(FORAGE_MIN, FORAGE_MAX)
             pos = Vec3(math.cos(ang) * dist, 0.4, math.sin(ang) * dist)
-            # stay off the hut, cauldron, and crate
-            if pos.length() > 6.5 and not (abs(pos.x) < 4 and pos.z < -5) and abs(pos.x - 6.5) + abs(pos.z - 2.5) > 3:
+            if forage_spawn_ok(pos):
                 break
         out.append(Forage(bus, random.choice(kinds), pos))
     return out

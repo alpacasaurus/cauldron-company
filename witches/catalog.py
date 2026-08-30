@@ -162,3 +162,186 @@ RECIPES = {
     frozenset(["mandrake", "gnomecap"]): ("Intern to Middle Management", "giant", 3),
     frozenset(["screamstool", "screamstool"]): ("That's Just Soup", "honk", 1),
 }
+
+WEAPON_DISPLAY = {
+    "bow": "Union Bow",
+    "pistol": "Dewpoint Pistol",
+}
+
+
+def _pair_label(ids):
+    names = sorted(
+        (INGREDIENTS[i]["name"] for i in ids),
+        key=str.casefold,
+    )
+    return " + ".join(names)
+
+
+def outcome_for_pair(a, b):
+    """What a two-ingredient dump becomes, if it is a known batch."""
+    key = frozenset([a, b])
+    food = FOOD_RECIPES.get(key)
+    if food:
+        name, healing = food
+        return f"{name} (+{healing} HP)"
+    weapon = WEAPON_RECIPES.get(key)
+    if weapon:
+        return WEAPON_DISPLAY[weapon]
+    potion = RECIPES.get(key)
+    if potion:
+        name, _effect, value = potion
+        return f"{name} (+{value})"
+    return None
+
+
+def recipe_pair_options(known_ids):
+    """Given ingredient ids already in hand or the cauldron, list (missing, outcome)."""
+    known = frozenset(known_ids)
+    if not known:
+        return []
+
+    options = []
+    seen = set()
+
+    def add(missing_id, outcome):
+        key = (missing_id, outcome)
+        if key in seen:
+            return
+        seen.add(key)
+        options.append((INGREDIENTS[missing_id]["name"], outcome))
+
+    for recipe_ids, (name, _effect, value) in RECIPES.items():
+        if known <= recipe_ids:
+            missing = recipe_ids - known
+            if len(missing) == 1:
+                add(next(iter(missing)), f"{name} (+{value})")
+
+    if known == frozenset(["screamstool"]):
+        soup = RECIPES[frozenset(["screamstool", "screamstool"])]
+        add("screamstool", f"{soup[0]} (+{soup[2]})")
+
+    for recipe_ids, weapon_id in WEAPON_RECIPES.items():
+        if known <= recipe_ids:
+            missing = recipe_ids - known
+            if len(missing) == 1:
+                add(next(iter(missing)), WEAPON_DISPLAY[weapon_id])
+
+    for recipe_ids, (name, healing) in FOOD_RECIPES.items():
+        if known <= recipe_ids:
+            missing = recipe_ids - known
+            if len(missing) == 1:
+                add(next(iter(missing)), f"{name} (+{healing} HP)")
+
+    options.sort(key=lambda pair: pair[1].casefold())
+    return options
+
+
+def format_recipe_options(known_ids, max_items=3):
+    options = recipe_pair_options(known_ids)
+    if not options:
+        return ""
+    parts = [f"{missing} → {outcome}" for missing, outcome in options[:max_items]]
+    text = " | ".join(parts)
+    extra = len(options) - max_items
+    if extra > 0:
+        text += f" | +{extra} more (Esc → Recipes)"
+    return text
+
+
+def needed_ingredient_id_set(known_ids):
+    ids = set()
+    for missing, _outcome in recipe_pair_options(known_ids):
+        for ingredient_id, spec in INGREDIENTS.items():
+            if spec["name"] == missing:
+                ids.add(ingredient_id)
+                break
+    return ids
+
+
+def recipe_menu_text():
+    """Compact recipe reference for menu screens."""
+    lines = ["POTIONS — deliver flask to crate for quota points"]
+    for ids, (name, _effect, value) in sorted(
+        RECIPES.items(), key=lambda item: (-item[1][2], item[1][0])
+    ):
+        lines.append(f"  {_pair_label(ids)} → {name} (+{value})")
+    lines.append("WEAPONS — same stir, auto-equips; R / Right Ctrl to fire")
+    for ids, weapon_id in sorted(WEAPON_RECIPES.items(), key=lambda item: WEAPON_DISPLAY[item[1]]):
+        lines.append(f"  {_pair_label(ids)} → {WEAPON_DISPLAY[weapon_id]}")
+    lines.append("FOOD — drink key with empty flask to eat (+HP)")
+    for ids, (name, healing) in sorted(FOOD_RECIPES.items(), key=lambda item: item[1][0]):
+        lines.append(f"  {_pair_label(ids)} → {name} (+{healing} HP)")
+    lines.append("Unknown pairs become random sludge (+1). Compliment the cauldron.")
+    return "\n".join(lines)
+
+
+def stir_bar(stir, goal=8):
+    filled = min(max(int(stir), 0), goal)
+    return f"[{'█' * filled}{'░' * (goal - filled)}] {filled}/{goal}"
+
+
+def hud_quick_recipes():
+    """Always-visible cheat sheet for the highest-value known batches."""
+    lines = ["RECIPES (+quota)"]
+    for ids, (name, _effect, value) in sorted(
+        RECIPES.items(), key=lambda item: (-item[1][2], item[1][0])
+    ):
+        if value >= 3:
+            lines.append(f"{_pair_label(ids)} → {name} (+{value})")
+    lines.append("More +2 potions:")
+    shown = 0
+    for ids, (name, _effect, value) in sorted(
+        RECIPES.items(), key=lambda item: item[1][0]
+    ):
+        if value == 2 and shown < 3:
+            lines.append(f"{_pair_label(ids)} → {name}")
+            shown += 1
+    lines.append("WEAPONS / FOOD")
+    for ids, weapon_id in sorted(WEAPON_RECIPES.items(), key=lambda item: WEAPON_DISPLAY[item[1]]):
+        lines.append(f"{_pair_label(ids)} → {WEAPON_DISPLAY[weapon_id]}")
+    for ids, (name, healing) in sorted(FOOD_RECIPES.items(), key=lambda item: item[1][0]):
+        lines.append(f"{_pair_label(ids)} → {name} (+{healing} HP)")
+    return "\n".join(lines)
+
+
+def player_pair_hint(inventory, cauldron_contents):
+    if cauldron_contents and inventory:
+        outcome = outcome_for_pair(cauldron_contents[0]["id"], inventory[-1]["id"])
+        if outcome:
+            return f"Dump {inventory[-1]['name']} → {outcome}"
+    if inventory:
+        opts = format_recipe_options([inventory[-1]["id"]], max_items=1)
+        if opts:
+            return f"{inventory[-1]['name']} → {opts}"
+    return ""
+
+
+def cauldron_hud_text(contents, stir, brew_ready, brew_lock):
+    ids = [item["id"] for item in contents]
+    if brew_lock > 0:
+        return "CAULDRON: cooling down..."
+    if brew_ready > 0:
+        return "CAULDRON: settling... hands off!"
+    if len(ids) >= 2:
+        soup = " + ".join(item["name"] for item in contents[:2])
+        outcome = outcome_for_pair(ids[0], ids[1])
+        line = f"CAULDRON: {soup}"
+        if outcome:
+            line += f"\n→ {outcome}"
+        return f"{line}\nStir {stir_bar(stir)}"
+    if len(ids) == 1:
+        pairs = format_recipe_options(ids, max_items=2)
+        line = f"CAULDRON: {contents[0]['name']}"
+        if pairs:
+            line += f"\nNeed {pairs}"
+        else:
+            line += "\nNeed one more snack"
+        return line
+    return "CAULDRON: empty\nDump 2 snacks on green mat, stir 8×"
+
+
+def deliver_hud_text(players):
+    for player in players:
+        if player.flask:
+            return f"DELIVER {player.flask['name']} (+{player.flask['value']}) → quota crate"
+    return ""

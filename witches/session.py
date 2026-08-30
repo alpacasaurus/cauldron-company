@@ -27,8 +27,24 @@ from witches.catalog import (
     DIALOGUE_AMBIENT,
     DIALOGUE_MILESTONE,
     GOSSIP,
+    cauldron_hud_text,
+    deliver_hud_text,
+    format_recipe_options,
+    hud_quick_recipes,
+    needed_ingredient_id_set,
+    outcome_for_pair,
+    player_pair_hint,
+    recipe_menu_text,
 )
 from witches.debuglog import banner, log, log_path
+from witches.map import (
+    CAM_X_LIMIT,
+    CAM_Z_MAX,
+    CAM_Z_MIN,
+    CAMERA_BACK,
+    CAMERA_HEIGHT,
+    FORAGE_COUNT,
+)
 from witches.forage import spawn_forage
 from witches.glfix import portable_unlit
 from witches.combat import WEAPONS, spawn_enemy
@@ -192,6 +208,8 @@ class Director(Entity):
         self.paused = False
         self.player_count = 1
         self._update_broken = False
+        self.recipe_overlay = False
+        self.recipe_overlay_bits = []
         self.cam_pos = Vec3(0, 14, 24)
         camera.fov = 60
         window.color = color.hsv(250, 0.45, 0.07)
@@ -291,12 +309,13 @@ class Director(Entity):
         ]
         self.menu_screen = "play"
 
-    def _column(self, text, x, y, scale=0.85, hue=0, sat=0, value=0.82):
+    def _column(self, text, x, y, scale=0.85, hue=0, sat=0, value=0.82, z=0):
         return Text(
             text=text,
             parent=camera.ui,
             x=x,
             y=y,
+            z=z,
             origin=(-0.5, 0.5),
             scale=scale,
             color=color.hsv(hue, sat, value),
@@ -316,6 +335,7 @@ class Director(Entity):
             ("Fire weapon", "R", "Right Ctrl"),
             ("Scritch the cat", "Q", "P"),
             ("Compliment the pot", "C", "]"),
+            ("Recipe overlay", "Tab", "Tab"),
         ]
         self.menu_bits = [
             self._label("HOW TO PLAY", 0.4, scale=1.8, hue=300, sat=0.4, value=1),
@@ -332,13 +352,27 @@ class Director(Entity):
             self._column("\n".join(r[1] for r in rows), 0.0, 0.04),
             self._column("\n".join(r[2] for r in rows), 0.23, 0.04),
             self._label(
-                "Bow: Breadstick + Yarn.  Pistol: Gnome Hat + Dew.  Food: Breadstick + Frog.",
+                "Tab toggles the full recipe list mid-shift. Esc pauses (Recipes there too).",
                 -0.29,
                 scale=0.85,
             ),
-            self._button("Back", -0.4, self.main_menu, hue=250, sat=0.2, value=0.25),
+            self._button("Recipe list", -0.38, self.recipes_menu, hue=110, sat=0.45, value=0.32),
+            self._button("Back", -0.48, self.main_menu, hue=250, sat=0.2, value=0.25),
         ]
         self.menu_screen = "controls"
+
+    def recipes_menu(self, back=None):
+        self._clear_menu()
+        if back is None:
+            back = self.controls_menu
+        self.recipes_back = back
+        self.menu_bits = [
+            self._backdrop(),
+            self._label("RECIPES", 0.46, scale=1.8, hue=300, sat=0.4, value=1, z=-0.2),
+            self._column(recipe_menu_text(), 0.0, 0.38, scale=0.58, z=-0.2),
+            self._button("Back", -0.46, back, hue=250, sat=0.2, value=0.25, z=-0.2),
+        ]
+        self.menu_screen = "recipes"
 
     # ------------------------------------------------------------- shift flow
 
@@ -369,7 +403,7 @@ class Director(Entity):
             f"crate at {tuple(round(v, 2) for v in self.world.quota.position)}, "
             f"spawns {[tuple(round(v, 2) for v in p.position) for p in self.bus.players]}"
         )
-        self.bus.forage = spawn_forage(self.bus, 20)
+        self.bus.forage = spawn_forage(self.bus, FORAGE_COUNT)
         for _ in range(2):
             spawn_enemy(self.bus)
         self.bus.enemy_spawn_timer = 14
@@ -383,6 +417,7 @@ class Director(Entity):
         """Strip the scene back to nothing so the next shift starts clean."""
         application.paused = False
         self.paused = False
+        self._clear_recipe_overlay()
         self._clear_menu()
         for e in self.end_bits:
             destroy_tree(e)
@@ -427,15 +462,20 @@ class Director(Entity):
             return
         self.paused = True
         application.paused = True
+        self._clear_recipe_overlay()
+        self._show_pause_menu()
+
+    def _show_pause_menu(self):
         self._clear_menu()
         self.menu_bits = [
             self._backdrop(),
             self._label("PAUSED", 0.28, scale=2.0, hue=300, sat=0.4, value=1, z=-0.2),
             self._label("The soup waits. It is patient. It is judging.", 0.19, scale=0.95, z=-0.2),
             self._button("Resume", 0.04, self.resume, z=-0.2),
-            self._button("Restart shift", -0.06, self.restart, hue=200, sat=0.45, value=0.32, z=-0.2),
-            self._button("Main menu", -0.16, self.to_menu, hue=250, sat=0.25, value=0.28, z=-0.2),
-            self._button("Quit", -0.26, quit_game, hue=0, sat=0.5, value=0.3, z=-0.2),
+            self._button("Recipes", -0.04, lambda: self.recipes_menu(self._show_pause_menu), hue=110, sat=0.45, value=0.32, z=-0.2),
+            self._button("Restart shift", -0.14, self.restart, hue=200, sat=0.45, value=0.32, z=-0.2),
+            self._button("Main menu", -0.24, self.to_menu, hue=250, sat=0.25, value=0.28, z=-0.2),
+            self._button("Quit", -0.34, quit_game, hue=0, sat=0.5, value=0.3, z=-0.2),
         ]
         self.menu_screen = "pause"
 
@@ -446,12 +486,82 @@ class Director(Entity):
         self.paused = False
         application.paused = False
 
+    def _clear_recipe_overlay(self):
+        for entity in self.recipe_overlay_bits:
+            destroy_tree(entity)
+        self.recipe_overlay_bits.clear()
+        self.recipe_overlay = False
+
+    def toggle_recipe_overlay(self):
+        if self.recipe_overlay:
+            self._clear_recipe_overlay()
+            return
+        self.recipe_overlay = True
+        self.recipe_overlay_bits = [
+            Entity(
+                parent=camera.ui,
+                model="quad",
+                scale=(0.52, 0.92),
+                x=-0.48,
+                z=-0.05,
+                color=color.rgba32(6, 2, 14, 210),
+                shader=portable_unlit,
+            ),
+            Text(
+                text=recipe_menu_text(),
+                parent=camera.ui,
+                x=-0.72,
+                y=0.4,
+                origin=(-0.5, 0.5),
+                scale=0.5,
+                color=color.hsv(50, 0.25, 0.95),
+            ),
+            Text(
+                text="Tab close  |  Esc pause",
+                parent=camera.ui,
+                x=-0.72,
+                y=-0.44,
+                origin=(-0.5, 0),
+                scale=0.62,
+                color=color.hsv(0, 0, 0.65),
+            ),
+        ]
+
     def _hud(self):
         for e in self.hud:
             destroy(e)
         self.hud = []
+        self._clear_recipe_overlay()
         self.txt_quota = Text(parent=camera.ui, origin=(-0.5, 0.5), position=(-0.86, 0.48), scale=1.15)
         self.txt_time = Text(parent=camera.ui, origin=(0.5, 0.5), position=(0.86, 0.48), scale=1.15)
+        self.txt_goal = Text(
+            parent=camera.ui,
+            origin=(0, 0.5),
+            position=(0, 0.48),
+            scale=0.82,
+            color=color.hsv(45, 0.55, 1),
+        )
+        self.txt_cauldron = Text(
+            parent=camera.ui,
+            origin=(0, 0.5),
+            position=(0, 0.38),
+            scale=0.72,
+            color=color.hsv(110, 0.35, 0.95),
+        )
+        self.txt_recipes = Text(
+            parent=camera.ui,
+            origin=(0.5, 0.5),
+            position=(0.84, 0.18),
+            scale=0.48,
+            color=color.hsv(200, 0.25, 0.88),
+        )
+        self.txt_keys = Text(
+            parent=camera.ui,
+            origin=(0, 0),
+            position=(0, -0.44),
+            scale=0.62,
+            color=color.hsv(0, 0, 0.62),
+        )
         self.txt_sub = Text(
             parent=camera.ui,
             origin=(0, 0),
@@ -475,6 +585,10 @@ class Director(Entity):
         self.hud = [
             self.txt_quota,
             self.txt_time,
+            self.txt_goal,
+            self.txt_cauldron,
+            self.txt_recipes,
+            self.txt_keys,
             self.txt_sub,
             self.txt_bark,
             self.txt_p1,
@@ -483,14 +597,21 @@ class Director(Entity):
 
     def _inv(self, p):
         bits = ", ".join(i["name"] for i in p.inventory) or "pockets full of nothing"
-        flask = p.flask["name"] if p.flask else "no flask"
+        if p.flask:
+            flask = f"{p.flask['name']} (+{p.flask['value']}) → crate"
+        else:
+            flask = "no flask"
         meal = p.meal["name"] if p.meal else "no meal"
         weapon = WEAPONS[p.weapon]["name"] if p.weapon else "no weapon"
         fx = ",".join(p.effects) or "sober"
-        return (
+        lines = (
             f"{p.display_name}: {bits} | HP {p.health}/{p.max_health}\n"
             f"{flask} | {meal} | {weapon} | {fx}"
         )
+        hint = player_pair_hint(p.inventory, self.cauldron.contents if self.cauldron else [])
+        if hint:
+            lines += f"\n  ↳ {hint}"
+        return lines
 
     def _flat_dist(self, a, b):
         d = a - b
@@ -518,7 +639,12 @@ class Director(Entity):
         self.bus.forage.remove(f)
         f.remove()
         if not silent:
-            self.bus.say(f"{player.display_name} pocketed {player.inventory[-1]['name']}.")
+            item = player.inventory[-1]
+            pairs = format_recipe_options([item["id"]], max_items=2)
+            msg = f"{player.display_name} pocketed {item['name']}."
+            if pairs:
+                msg += f" Pairs with: {pairs}"
+            self.bus.say(msg)
         self.bus.forage.extend(spawn_forage(self.bus, 1))
         return True
 
@@ -606,10 +732,15 @@ class Director(Entity):
                 # Quitting the whole app on a stray Esc is brutal for a game
                 # played on one shared keyboard.
                 self.toggle_pause()
+            elif self.menu_screen == "recipes":
+                (self.recipes_back or self.controls_menu)()
             elif self.bus.over or self.menu_screen in ("play", "controls"):
                 self.to_menu()
             else:
                 quit_game()
+            return
+        if key == "tab" and self.bus.playing and not self.paused:
+            self.toggle_recipe_overlay()
             return
         if self.paused:
             return
@@ -729,9 +860,9 @@ class Director(Entity):
             mid = sum((p.position for p in self.bus.players), Vec3(0, 0, 0)) / len(self.bus.players)
         else:
             mid = Vec3(0, 0, 0)
-        mid = Vec3(max(-11, min(11, mid.x)), 0, max(-8, min(14, mid.z)))
+        mid = Vec3(max(-CAM_X_LIMIT, min(CAM_X_LIMIT, mid.x)), 0, max(CAM_Z_MIN, min(CAM_Z_MAX, mid.z)))
         target = mid + Vec3(0, 0, -3)
-        desired = target + Vec3(0, 14, 24)
+        desired = target + Vec3(0, CAMERA_HEIGHT, CAMERA_BACK)
         self.cam_pos = lerp3(self.cam_pos, desired, min(1, dt * 3.5))
         camera.position = self.cam_pos
         camera.look_at(target + Vec3(0, 1, 0))
@@ -744,6 +875,19 @@ class Director(Entity):
         self.txt_quota.text = f"MOON QUOTA  {self.bus.quota}/{QUOTA_GOAL}"
         m, s = divmod(max(0, int(self.bus.remaining)), 60)
         self.txt_time.text = f"ROOSTER {m}:{s:02d}"
+        goal = deliver_hud_text(self.bus.players)
+        self.txt_goal.text = goal
+        self.txt_goal.enabled = bool(goal)
+        pot = self.cauldron
+        self.txt_cauldron.text = cauldron_hud_text(
+            pot.contents,
+            pot.stir,
+            pot.brew_ready,
+            pot.brew_lock,
+        )
+        self.txt_recipes.text = hud_quick_recipes()
+        self.txt_recipes.enabled = not self.recipe_overlay
+        self.txt_keys.text = "Tab recipe book | Esc pause | E interact dump/stir | F drink/eat | R fire"
         if self.bus.speaking:
             hint = self.bus.subtitle
         else:
@@ -768,33 +912,65 @@ class Director(Entity):
             return f"{key} deliver {p.flask['name']} to the crate"
         if self.bus.overflow and self._flat_dist(p.position, self.world.quota.position) < 3.2:
             return f"{key} recover spilled {self.bus.overflow[0]['name']} from the crate"
+        cauldron_ids = [c["id"] for c in self.cauldron.contents]
         if self.cauldron.in_range(p) and p.inventory:
-            return f"{key} dump {p.inventory[-1]['name']} into the cauldron"
+            held = p.inventory[-1]
+            if cauldron_ids:
+                outcome = outcome_for_pair(cauldron_ids[0], held["id"])
+                if len(cauldron_ids) >= 2:
+                    outcome = outcome_for_pair(cauldron_ids[0], cauldron_ids[1])
+                if outcome:
+                    return f"{key} dump {held['name']} → brews {outcome}"
+            return f"{key} dump {held['name']} into the cauldron"
         if self.cauldron.in_range(p) and len(self.cauldron.contents) >= 2:
             if self.cauldron.stir >= 8:
                 return "Hands off! Eric says the potion is settling."
-            return f"{key} stir  ({self.cauldron.stir}/8)  contents: " + ", ".join(
-                c["name"] for c in self.cauldron.contents
-            )
+            soup = ", ".join(c["name"] for c in self.cauldron.contents[:2])
+            outcome = outcome_for_pair(cauldron_ids[0], cauldron_ids[1])
+            batch = f" → {outcome}" if outcome else ""
+            return f"{key} stir  ({self.cauldron.stir}/8)  {soup}{batch}"
         if p.inventory:
             pot_dist = self._flat_dist(p.position, self.cauldron.position)
+            held = p.inventory[-1]
+            if cauldron_ids:
+                outcome = outcome_for_pair(cauldron_ids[0], held["id"])
+                if outcome:
+                    return (
+                        f"Cauldron has {self.cauldron.contents[0]['name']}. "
+                        f"Bring {held['name']} → {outcome} ({pot_dist:.0f} steps)"
+                    )
+            pairs = format_recipe_options([held["id"]], max_items=2)
             if pot_dist < 9:
-                return f"Stand on the cauldron's mat, then {key} to dump {p.inventory[-1]['name']}"
-            # Carrying loot but lost in the woods: always say where the pot is.
-            return (
-                f"Carrying {len(p.inventory)}. The cauldron is the green mat by the "
-                f"hut, {pot_dist:.0f} steps away"
+                base = f"Stand on the cauldron's mat, then {key} to dump {held['name']}"
+                return f"{base} | {pairs}" if pairs else base
+            base = (
+                f"Carrying {held['name']}. Cauldron mat is {pot_dist:.0f} steps away"
             )
+            return f"{base} | {pairs}" if pairs else base
         if self.cauldron.contents:
             soup = ", ".join(c["name"] for c in self.cauldron.contents)
+            known = cauldron_ids
             snack = self._nearest_forage(p, 3.4)
+            needed = needed_ingredient_id_set(known)
+            if snack and snack.kind in needed:
+                outcome = outcome_for_pair(known[0], snack.kind)
+                if outcome:
+                    return f"Cauldron: {soup} | {key} grab {snack.spec['name']} → {outcome}"
+            pairs = format_recipe_options(known)
             if snack:
-                return f"Cauldron: {soup}   |   {key} grab {snack.spec['name']}"
+                return f"Cauldron: {soup} | {key} grab {snack.spec['name']}" + (
+                    f" | need {pairs}" if pairs else ""
+                )
+            if pairs:
+                return f"Cauldron: {soup} | need {pairs}"
             return f"Cauldron: {soup}   |   need 2 to stir"
         snack = self._nearest_forage(p, 3.4)
         if snack:
+            pairs = format_recipe_options([snack.kind], max_items=2)
+            if pairs:
+                return f"{key} grab {snack.spec['name']} | pairs: {pairs}"
             return f"{key} grab {snack.spec['name']}"
-        return "Wander the glowing pads. Walk into a snack or mash E."
+        return "Wander the glowing pads. Esc → Recipes lists every combo."
 
 
 def lerp3(a, b, t):
